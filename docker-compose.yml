@@ -1,0 +1,15 @@
+version: '3'
+services:
+  chartmuseum:
+    image: docker.io/bitnami/chartmuseum:0-debian-10
+    ports:
+      - '8080:8080'
+    volumes:
+      - chartmuseum_data:/bitnami/data:rw
+    environment: 
+      - STORAGE=local
+      - STORAGE_LOCAL_ROOTDIR="/bitnami/data"
+    user: root
+volumes:
+  chartmuseum_data:
+    driver: local
