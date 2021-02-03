@@ -62,7 +62,7 @@ istio:
   # See istio label of ingress gatway
   annotations: {}
   hosts:
-    - host: "simpe.local"
+    - host: "simple.local"
   tls: []
 
 # Canary deployments
