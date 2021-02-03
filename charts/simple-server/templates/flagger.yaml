@@ -53,10 +53,10 @@ spec:
     # schedule interval (default 60s)
     interval: 1m
     # max number of failed metric checks before rollback
-    threshold: 1
+    threshold: 3
     # max traffic percentage routed to canary
     # percentage (0-100)
-    maxWeight: 50
+    maxWeight: 70
     # canary increment step
     # percentage (0-100)
     stepWeight: 10
@@ -70,15 +70,15 @@ spec:
       thresholdRange:
         min: 100
       interval: 1m
-    - name: request-duration-custom
-      templateRef:
-        name: latency
-        namespace: {{ .Release.Namespace }}
-      # maximum req duration P99
-      # milliseconds
-      thresholdRange:
-        max: 15
-      interval: 1m
+    # - name: request-duration-custom
+    #   templateRef:
+    #     name: latency
+    #     namespace: {{ .Release.Namespace }}
+    #   # maximum req duration P99
+    #   # milliseconds
+    #   thresholdRange:
+    #     max: 15
+    #   interval: 1m
     # testing (optional)
     {{- if .Values.canary.loadtester.enabled }}
     webhooks:
@@ -102,22 +102,22 @@ spec:
         rate(
             istio_requests_total{
               reporter="destination",
+              destination_service_name="{{ "{{" }} target {{ "}}" }}-canary",
               destination_workload_namespace="{{ "{{" }} namespace {{ "}}" }}",
-              destination_workload="{{ "{{" }} target {{ "}}" }}-canary",
               response_code!~"5.*"
-            }[{{ "{{" }} interval {{ "}}" }}]
+            }[1m]
         )
-    ) 
-    / 
+    )
+    /
     sum(
         rate(
             istio_requests_total{
               reporter="destination",
-              destination_workload_namespace="{{ "{{" }} namespace {{ "}}" }}",
-              destination_workload="{{ "{{" }} target {{ "}}" }}-canary"
-            }[{{ "{{" }} interval {{ "}}" }}]
+              destination_service_name="{{ "{{" }} target {{ "}}" }}-canary",
+              destination_workload_namespace="{{ "{{" }} namespace {{ "}}" }}"
+            }[1m]
         )
-    )
+    ) * 100
 ---
 apiVersion: flagger.app/v1beta1
 kind: MetricTemplate
