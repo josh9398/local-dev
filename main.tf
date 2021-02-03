@@ -138,33 +138,10 @@ locals {
       persistentVolume = {
         enabled = false
       }
+      global = {
+        scrape_interval = "15s"
+      }
     }
-    extraScrapeConfigs = <<-EOT
-    # Scrape config for envoy stats
-    - job_name: 'envoy-stats'
-      metrics_path: /stats/prometheus
-      scrape_interval: 15s
-      scrape_timeout: 10s
-      kubernetes_sd_configs:
-      - role: pod
-      relabel_configs:
-      - source_labels: [meta_kubernetes_pod_container_port_name]
-        action: keep
-        regex: '.*-envoy-prom'
-      - source_labels: [__address, meta_kubernetes_pod_annotation_prometheus_io_port]
-        action: replace
-        regex: ([^:]+)(?::\d+)?;(\d+)
-        replacement: $1:15090
-        target_label: __address
-      - action: labeldrop
-        regex: __meta_kubernetes_pod_label_(.+)
-      - source_labels: [__meta_kubernetes_namespace]
-        action: replace
-        target_label: namespace
-      - source_labels: [__meta_kubernetes_pod_name]
-        action: replace
-        target_label: pod_name
-    EOT
   }
 }
 
@@ -192,6 +169,7 @@ locals {
     crd = {
       create = false
     }
+    logLevel = "debug"
     meshProvider  = "istio"
     metricsServer = "http://prometheus-server.${kubernetes_namespace.monitoring.id}:80"
   }

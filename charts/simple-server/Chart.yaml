@@ -1,0 +1,11 @@
+apiVersion: v2
+name: simple-server
+description: A Helm chart for Kubernetes
+type: application
+keywords:
+  - local-dev
+  - simple-server
+sources:
+  - http://github.com/josh9398/local-dev
+version: 0.1.0
+appVersion: 0.0.1

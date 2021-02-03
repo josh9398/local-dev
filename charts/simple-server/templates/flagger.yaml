@@ -1,0 +1,143 @@
+{{- if .Values.flagger.enabled -}}
+{{- $fullName := include "simple-server.fullname" . -}}
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "simple-server.labels" . | nindent 4 }}
+  {{- with .Values.flagger.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # deployment reference
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "simple-server.fullname" . }}
+  # the maximum time in seconds for the canary deployment
+  # to make progress before it is rollback (default 600s)
+  progressDeadlineSeconds: 60
+  # HPA reference (optional)
+  {{- if .Values.autoscaling.enabled }}
+  autoscalerRef:
+    apiVersion: autoscaling/v2beta2
+    kind: HorizontalPodAutoscaler
+    name: {{ include "simple-server.fullname" . }}
+  {{- end }}
+  service:
+    # service port number
+    port: {{ .Values.service.port }}
+    # container port number or name (optional)
+    targetPort: {{ .Values.service.containerPort }}
+    # Istio gateways (optional)
+    gateways:
+    - {{ $fullName }}.{{ .Release.Namespace }}.svc.cluster.local
+    # Istio virtual service host names (optional)
+    hosts:
+    {{- range .Values.istio.hosts }}
+    - {{ .host | quote }}
+    {{- end }}
+    # Istio traffic policy (optional)
+    trafficPolicy:
+      tls:
+        # use ISTIO_MUTUAL when mTLS is enabled
+        mode: DISABLE
+    # Istio retry policy (optional)
+    retries:
+      attempts: 3
+      perTryTimeout: 1s
+      retryOn: "gateway-error,connect-failure,refused-stream"
+  analysis:
+    # schedule interval (default 60s)
+    interval: 1m
+    # max number of failed metric checks before rollback
+    threshold: 1
+    # max traffic percentage routed to canary
+    # percentage (0-100)
+    maxWeight: 50
+    # canary increment step
+    # percentage (0-100)
+    stepWeight: 10
+    metrics:
+    - name: success-rate-500s
+      templateRef:
+        name: success-rate-500s
+        namespace: {{ .Release.Namespace }}
+      # minimum req success rate (non 5xx responses)
+      # percentage (0-100)
+      thresholdRange:
+        min: 100
+      interval: 1m
+    - name: request-duration-custom
+      templateRef:
+        name: latency
+        namespace: {{ .Release.Namespace }}
+      # maximum req duration P99
+      # milliseconds
+      thresholdRange:
+        max: 15
+      interval: 1m
+    # testing (optional)
+    {{- if .Values.flagger.loadtester.enabled }}
+    webhooks:
+      - name: load-test
+        url: "http://{{ .Values.flagger.loadtester.name }}.{{ .Values.flagger.loadtester.namespace }}/"
+        timeout: 5s
+        metadata:
+          cmd: "hey -z 1m -q 10 -c 2 http://{{ include "simple-server.fullname" . }}-canary.{{ .Release.Namespace }}:{{ .Values.service.port }}/"
+    {{- end }}
+---
+apiVersion: flagger.app/v1beta1
+kind: MetricTemplate
+metadata:
+  name: success-rate-500s
+spec:
+  provider:
+    type: prometheus
+    address: http://{{ .Values.flagger.prometheus.name }}.{{ .Values.flagger.prometheus.namespace }}:{{ .Values.flagger.prometheus.port }}
+  query: |
+    sum(
+        rate(
+            istio_requests_total{
+              reporter="destination",
+              destination_workload_namespace="{{ "{{" }} namespace {{ "}}" }}",
+              destination_workload="{{ "{{" }} target {{ "}}" }}-canary",
+              response_code!~"5.*"
+            }[{{ "{{" }} interval {{ "}}" }}]
+        )
+    ) 
+    / 
+    sum(
+        rate(
+            istio_requests_total{
+              reporter="destination",
+              destination_workload_namespace="{{ "{{" }} namespace {{ "}}" }}",
+              destination_workload="{{ "{{" }} target {{ "}}" }}-canary"
+            }[{{ "{{" }} interval {{ "}}" }}]
+        )
+    )
+---
+apiVersion: flagger.app/v1beta1
+kind: MetricTemplate
+metadata:
+  name: latency
+spec:
+  provider:
+    type: prometheus
+    address: http://{{ .Values.flagger.prometheus.name }}.{{ .Values.flagger.prometheus.namespace }}:{{ .Values.flagger.prometheus.port }}
+  query: |
+    histogram_quantile(
+        0.99,
+        sum(
+            rate(
+                istio_request_duration_seconds_bucket{
+                    reporter="destination",
+                    destination_workload_namespace="{{ "{{" }} namespace {{ "}}" }}",
+                    destination_workload=~"{{ "{{" }} target {{ "}}" }}-canary"
+                }[{{ "{{" }} interval {{ "}}" }}]
+            )
+        ) by (le)
+    )
+{{- end }}
