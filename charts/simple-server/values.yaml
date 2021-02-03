@@ -66,14 +66,14 @@ istio:
   tls: []
 
 # Canary deployments
-flagger:
+canary:
   enabled: true
   annotations: {}
   # flagger load tester
   loadtester:
     enabled: true
     name: "flagger-loadtester"
-    namespace: "test"
+    namespace: "flagger-system"
   prometheus:
     name: "prometheus-server"
     namespace: "monitoring"

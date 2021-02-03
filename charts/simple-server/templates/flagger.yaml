@@ -1,4 +1,4 @@
-{{- if .Values.flagger.enabled -}}
+{{- if .Values.canary.enabled -}}
 {{- $fullName := include "simple-server.fullname" . -}}
 apiVersion: flagger.app/v1beta1
 kind: Canary
@@ -6,7 +6,7 @@ metadata:
   name: {{ $fullName }}
   labels:
     {{- include "simple-server.labels" . | nindent 4 }}
-  {{- with .Values.flagger.annotations }}
+  {{- with .Values.canary.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -80,10 +80,10 @@ spec:
         max: 15
       interval: 1m
     # testing (optional)
-    {{- if .Values.flagger.loadtester.enabled }}
+    {{- if .Values.canary.loadtester.enabled }}
     webhooks:
       - name: load-test
-        url: "http://{{ .Values.flagger.loadtester.name }}.{{ .Values.flagger.loadtester.namespace }}/"
+        url: "http://{{ .Values.canary.loadtester.name }}.{{ .Values.canary.loadtester.namespace }}/"
         timeout: 5s
         metadata:
           cmd: "hey -z 1m -q 10 -c 2 http://{{ include "simple-server.fullname" . }}-canary.{{ .Release.Namespace }}:{{ .Values.service.port }}/"
@@ -96,7 +96,7 @@ metadata:
 spec:
   provider:
     type: prometheus
-    address: http://{{ .Values.flagger.prometheus.name }}.{{ .Values.flagger.prometheus.namespace }}:{{ .Values.flagger.prometheus.port }}
+    address: http://{{ .Values.canary.prometheus.name }}.{{ .Values.canary.prometheus.namespace }}:{{ .Values.canary.prometheus.port }}
   query: |
     sum(
         rate(
@@ -126,7 +126,7 @@ metadata:
 spec:
   provider:
     type: prometheus
-    address: http://{{ .Values.flagger.prometheus.name }}.{{ .Values.flagger.prometheus.namespace }}:{{ .Values.flagger.prometheus.port }}
+    address: http://{{ .Values.canary.prometheus.name }}.{{ .Values.canary.prometheus.namespace }}:{{ .Values.canary.prometheus.port }}
   query: |
     histogram_quantile(
         0.99,

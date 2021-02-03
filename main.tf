@@ -164,6 +164,12 @@ resource "helm_release" "prometheus" {
 # ----------------------------------------------------------------------------------------------------------------------
 # flagger
 # ----------------------------------------------------------------------------------------------------------------------
+resource "kubernetes_namespace" "flagger-system" {
+  metadata {
+    name = "flagger-system"
+  }
+}
+
 locals {
   helmChartValuesFlagger = {
     crd = {
@@ -192,7 +198,7 @@ resource "helm_release" "flagger" {
   name       = "flagger"
   repository = "https://flagger.app"
   chart      = "flagger"
-  namespace  = kubernetes_namespace.istio-system.id
+  namespace  = kubernetes_namespace.flagger-system.id
 
   values = [
     yamlencode(local.helmChartValuesFlagger)
@@ -203,6 +209,13 @@ resource "helm_release" "flagger" {
     helm_release.istio-discovery,
     kubectl_manifest.flagger-crds
   ]
+}
+
+resource "helm_release" "flagger-loadtester" {
+  name       = "flagger-loadtester"
+  repository = "https://flagger.app"
+  chart      = "loadtester"
+  namespace  = kubernetes_namespace.flagger-system.id
 }
 
 # ----------------------------------------------------------------------------------------------------------------------
